@@ -36,11 +36,55 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  lockfile-guard:
+    name: Lockfile guard (pyproject vs uv.lock)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate lockfile changed with dependency spec
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_SHA="${{ github.event.before }}"
+
+          # On tag creation or branch-creation pushes github.event.before
+          # can be all zeros.
+          if [[ -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+
+          CHANGED_FILES="$(git diff --name-only "${BASE_SHA}" "${{ github.sha }}")"
+          echo "Changed files since base:"
+          echo "${CHANGED_FILES}"
+
+          PYPROJECT_CHANGED=0
+          UV_LOCK_CHANGED=0
+
+          if echo "${CHANGED_FILES}" | grep -qx "pyproject.toml"; then
+            PYPROJECT_CHANGED=1
+          fi
+
+          if echo "${CHANGED_FILES}" | grep -qx "uv.lock"; then
+            UV_LOCK_CHANGED=1
+          fi
+
+          if [[ "${PYPROJECT_CHANGED}" -eq 1 && "${UV_LOCK_CHANGED}" -ne 1 ]]; then
+            echo "::error::pyproject.toml changed but uv.lock did not. Run 'uv lock' and commit uv.lock."
+            exit 1
+          fi
+
+          echo "Lockfile guard passed."
+
   # Fast gating job — runs backend pytest + frontend node:test + tsc on a
   # single Linux runner. The matrix build below waits on this via `needs:`
   # so we don't burn 4× platform-matrix minutes on a broken commit.
   test:
     name: Tests (backend + frontend)
+    needs: lockfile-guard
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
