@@ -55,11 +55,14 @@ COPY omnivoice/ ./omnivoice/
 # Copy the pre-built React frontend from the builder stage
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Expose the single unified API and UI port
+# Expose the API/UI port. Railway overrides this with its own $PORT at runtime;
+# the CMD below falls back to 3900 for local docker run / docker-compose use.
 EXPOSE 3900
 
 # Mount points for persistent data (sqlite db, user voices, huggingface cache)
 VOLUME ["/app/omnivoice_data"]
 
-# Bind to 0.0.0.0 for external access
-ENTRYPOINT ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "3900"]
+# Use exec-form so ${PORT:-3900} is expanded by sh but uvicorn replaces
+# the shell as PID 1, preserving correct SIGTERM/SIGINT handling.
+# Railway injects $PORT automatically; local runs default to 3900.
+CMD ["sh", "-c", "exec uvicorn backend.main:app --host 0.0.0.0 --port \"${PORT:-3900}\""]

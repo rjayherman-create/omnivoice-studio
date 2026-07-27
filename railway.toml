@@ -1,0 +1,25 @@
+# ──────────────────────────────────────────────────────────────
+#  OmniVoice Studio — Railway Deployment Configuration
+#
+#  Deploy steps:
+#    1. Connect this repo in your Railway project.
+#    2. Set HF_TOKEN (and any other env vars) in Railway's
+#       Variables panel.
+#    3. Attach a Railway Volume at /app/omnivoice_data for
+#       persistent voice data and model cache.
+#    4. Set OMNIVOICE_ALLOWED_ORIGINS to your Railway public
+#       domain (e.g. https://yourapp.up.railway.app).
+#
+#  Railway injects $PORT automatically; the start command
+#  falls back to 3900 if it is absent.
+# ──────────────────────────────────────────────────────────────
+
+[build]
+dockerfile = "deploy/Dockerfile"
+dockerfileContextDir = "."
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
